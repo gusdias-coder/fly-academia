@@ -1,11 +1,96 @@
-const $=s=>document.querySelector(s);const modalities={Pilates:'Controle, consciência corporal e movimento.',Funcional:'Movimentos variados para a sua rotina.',GAP:'Uma aula com foco em glúteos, abdômen e pernas.',Ritmos:'Música e movimento para renovar a energia.',Alongamento:'Uma pausa para alongar e cuidar do corpo.'};
-$('#modalityCards').innerHTML=Object.entries(modalities).map(([name,desc],i)=>`<div class="col-12 ${i<4?'col-lg-6':''}"><article class="modality"><span class="eyebrow">${String(i+1).padStart(2,'0')} / COLETIVAS</span><h3>${name}</h3><p>${desc}</p><a href="#horarios" data-filter="${name}">Ver horários ↗</a></article></div>`).join('');
-const days=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];const schedule=[[],[['08:30','Pilates'],['19:00','GAP'],['19:30','Pilates']],[['08:30','Funcional'],['19:00','Funcional'],['19:30','Ritmos']],[['08:30','Pilates'],['19:00','GAP'],['19:30','Pilates']],[['08:30','Funcional'],['19:00','Funcional'],['19:30','Ritmos']],[['08:30','Alongamento']],[]];let selected=null;let booking=null;
-function drawSchedule(){const today=new Date().getDay();$('#schedule').innerHTML=[1,2,3,4,5,6,0].map(day=>{const rows=schedule[day].filter(r=>!$('#filter').value||r[1]===$('#filter').value);return `<details class="day" ${day===today?'open':''}><summary>${days[day]} ${day===today?'· Hoje':''}</summary>${rows.length?rows.map(([time,name])=>`<div class="class-row"><span><time>${time}</time>${name}</span><button type="button" data-day="${day}" data-time="${time}" data-name="${name}">Solicitar aula<span class="visually-hidden"> de ${name} às ${time}, ${days[day]}</span> ↗</button></div>`).join(''):`<p>${$('#filter').value?'Nenhuma aula desta modalidade neste dia. Experimente outro filtro.':day===0?'Sem aulas hoje. Veja segunda-feira.':'Sem aulas coletivas neste dia. Veja o próximo dia na grade.'}</p>`}</details>`}).join('')}
-$('#filter').addEventListener('change',drawSchedule);drawSchedule();document.querySelectorAll('[data-filter]').forEach(a=>a.addEventListener('click',()=>{$('#filter').value=a.dataset.filter;drawSchedule()}));
-$('#schedule').addEventListener('click',e=>{const b=e.target.closest('[data-day]');if(!b)return;const date=new Date();const delta=(Number(b.dataset.day)-date.getDay()+7)%7;date.setDate(date.getDate()+delta);const [h,m]=b.dataset.time.split(':');date.setHours(+h,+m,0,0);if(date<=new Date())date.setDate(date.getDate()+7);selected={name:b.dataset.name,date};$('#interest').value=selected.name;$('#chosen').textContent=`Horário desejado: ${date.toLocaleString('pt-BR',{dateStyle:'full',timeStyle:'short'})}. Sujeito à confirmação.`;$('#agendar').scrollIntoView();$('#name').focus({preventScroll:true})});$('#interest').addEventListener('change',()=>{selected=null;$('#chosen').textContent=''});
-function billing(annual){$('#monthly').classList.toggle('active',!annual);$('#annual').classList.toggle('active',annual);$('#monthly').setAttribute('aria-pressed',!annual);$('#annual').setAttribute('aria-pressed',annual);$('#planTitle').textContent=annual?'Plano anual recorrente':'Plano mensal';$('#price').textContent=annual?'R$ 99':'R$ 149';$('#contract').textContent=annual?'12 parcelas de R$ 99 · total R$ 1.188.':'Pagamento mensal.';$('#saving').textContent=annual?'Economize R$ 600 em 12 meses em relação ao mensal.':'Escolha o ritmo da sua rotina.'}$('#monthly').onclick=()=>billing(false);$('#annual').onclick=()=>billing(true);
-const plans=[...document.querySelectorAll('.plan')];$('.plan-dots').innerHTML=plans.map((p,i)=>`<button aria-label="Ver plano ${i+1}" aria-current="${i===0}" data-plan="${i}">●</button>`).join('');document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>{$('#plans').scrollTo({left:plans[+b.dataset.plan].offsetLeft-$('#plans').offsetLeft,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})});$('#plans').addEventListener('scroll',()=>{const x=$('#plans').getBoundingClientRect().left;const nearest=plans.reduce((best,p,i)=>Math.abs(p.getBoundingClientRect().left-x)<Math.abs(plans[best].getBoundingClientRect().left-x)?i:best,0);document.querySelectorAll('[data-plan]').forEach((b,i)=>b.setAttribute('aria-current',i===nearest))});
-$('#bookingForm').addEventListener('submit',e=>{e.preventDefault();const name=$('#name').value.trim(),phone=$('#phone').value.replace(/\D/g,'');const errors={name:name.length<2?'Digite seu nome com pelo menos 2 letras.':'',phone:!/^([1-9]{2}\d{8,9}|55[1-9]{2}\d{8,9})$/.test(phone)?'Informe DDD e telefone com 10 ou 11 dígitos.':''};for(const [key,error]of Object.entries(errors)){$('#'+key+'Error').textContent=error;$('#'+key).setAttribute('aria-invalid',Boolean(error))}const first=Object.keys(errors).find(k=>errors[k]);if(first){$('#'+first).focus();return}booking={name,phone,interest:$('#interest').value,selected};const timing=selected?selected.date.toLocaleString('pt-BR',{dateStyle:'full',timeStyle:'short'}):'Horário a combinar com a equipe';$('#summary').textContent=`${name}, modalidade: ${booking.interest}. ${timing}.`;const message=`Olá! Sou ${name}. Meu WhatsApp é ${phone}. Quero solicitar uma aula experimental de ${booking.interest}. ${timing}. Podem confirmar disponibilidade e condições?`;$('#sendRequest').href='https://wa.me/5551996010890?text='+encodeURIComponent(message);$('#calendar').hidden=!selected;$('#calendarNote').textContent=selected?'O evento é provisório. A academia ainda precisa confirmar.':'Escolha uma aula na grade para adicionar um horário provisório ao calendário.';$('#confirmation').showModal()});$('#closeConfirmation').onclick=()=>$('#confirmation').close();
-function stamp(d){return d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z/,'Z')}$('#calendar').onclick=()=>{if(!booking?.selected)return;const date=booking.selected.date,end=new Date(date.getTime()+3600000);const content=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Fly Academia//Solicitacao//PT-BR','BEGIN:VEVENT',`UID:${crypto.randomUUID()}@fly-tarrago`,`DTSTAMP:${stamp(new Date())}`,`DTSTART:${stamp(date)}`,`DTEND:${stamp(end)}`,`SUMMARY:Provisório - ${booking.interest} na Fly Tarragó`,'DESCRIPTION:Solicitação sujeita à confirmação pela academia. Duração estimada de 1 hora.','LOCATION:Rua Tenente Ary Tarragó 1942 - Porto Alegre','STATUS:TENTATIVE','END:VEVENT','END:VCALENDAR'].join('\r\n');const url=URL.createObjectURL(new Blob([content],{type:'text/calendar;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='fly-aula-provisoria.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
-const menu=$('#menu');menu.addEventListener('show.bs.offcanvas',()=>$('#menuButton').setAttribute('aria-expanded','true'));menu.addEventListener('hidden.bs.offcanvas',()=>$('#menuButton').setAttribute('aria-expanded','false'));menu.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{bootstrap.Offcanvas.getInstance(menu).hide()}));
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  let selected = null;
+  let booking = null;
+  $('#modalityCards').innerHTML = Object.entries(Fly.modalities).map(([name, data], i) => `
+    <div class="col-12 ${i < 4 ? 'col-lg-6' : ''}"><article class="modality">
+      <span class="modality-icon">${Fly.icon(data.icon)}</span>
+      <h3>${name}</h3><p>${data.description}</p>
+      <a href="horarios.html?modalidade=${encodeURIComponent(name)}">Ver horários ${Fly.icon('arrow')}</a>
+    </article></div>`).join('');
+
+  const params = new URLSearchParams(location.search);
+  const candidate = { name: params.get('modalidade'), date: params.get('data'), time: params.get('hora') };
+  if (Object.hasOwn(Fly.modalities, candidate.name || '')) $('#interest').value = candidate.name;
+  const selectionText = s => `${Fly.formatDate(s.date)} às ${s.time} (Porto Alegre)`;
+  function showSelection() {
+    $('#chosen').textContent = selected ? `Horário desejado: ${selectionText(selected)}. Sujeito à confirmação.` : '';
+    $('#clearSelection').hidden = !selected;
+  }
+  if (Fly.validSelection(candidate.date, candidate.time, candidate.name)) { selected = candidate; showSelection(); }
+  else if (params.has('data') || params.has('hora')) $('#chosen').textContent = 'Este horário não está disponível para solicitação. Escolha uma nova aula na página de horários ou combine com a equipe.';
+  $('#interest').addEventListener('change', () => { selected = null; showSelection(); });
+  $('#clearSelection').onclick = () => { selected = null; showSelection(); $('#interest').focus(); };
+
+  function billing(annual) {
+    $('#monthly').setAttribute('aria-pressed', String(!annual));
+    $('#annual').setAttribute('aria-pressed', String(annual));
+    $('#monthly').classList.toggle('active', !annual);
+    $('#annual').classList.toggle('active', annual);
+    $('#planTitle').textContent = annual ? 'Plano anual recorrente' : 'Plano mensal';
+    $('#price').textContent = annual ? 'R$ 99' : 'R$ 149';
+    $('#contract').textContent = annual ? '12 parcelas de R$ 99 · total R$ 1.188.' : 'Pagamento mensal.';
+    $('#saving').textContent = annual ? 'Economize R$ 600 em 12 meses em relação ao mensal.' : 'Escolha o ritmo da sua rotina.';
+    if (!reduced.matches && Element.prototype.animate) $('#price').animate([{ opacity: 0.3, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'ease-out' });
+  }
+  $('#monthly').onclick = () => billing(false);
+  $('#annual').onclick = () => billing(true);
+  const plans = [...document.querySelectorAll('.plan')];
+  $('.plan-dots').innerHTML = plans.map((p, i) => `<button aria-label="Ver plano ${i + 1}" aria-current="${i === 0}" data-plan="${i}"><span></span></button>`).join('');
+  document.querySelectorAll('[data-plan]').forEach(button => button.onclick = () => {
+    const list = $('#plans');
+    list.scrollTo({ left: list.scrollLeft + plans[Number(button.dataset.plan)].getBoundingClientRect().left - list.getBoundingClientRect().left, behavior: reduced.matches ? 'instant' : 'smooth' });
+  });
+  $('#plans').addEventListener('scroll', () => {
+    const left = $('#plans').getBoundingClientRect().left;
+    const nearest = plans.reduce((best, p, i) => Math.abs(p.getBoundingClientRect().left - left) < Math.abs(plans[best].getBoundingClientRect().left - left) ? i : best, 0);
+    document.querySelectorAll('[data-plan]').forEach((b, i) => b.setAttribute('aria-current', String(i === nearest)));
+  }, { passive: true });
+
+  $('#bookingForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const name = $('#name').value.trim();
+    const phone = $('#phone').value.replace(/\D/g, '');
+    const errors = {
+      name: !/\p{L}.*\p{L}/u.test(name) ? 'Digite seu nome com pelo menos duas letras.' : '',
+      phone: !/^(?:55)?[1-9]{2}\d{8,9}$/.test(phone) ? 'Informe seu telefone com DDD (10 ou 11 dígitos).' : ''
+    };
+    Object.entries(errors).forEach(([field, message]) => {
+      $('#' + field + 'Error').textContent = message;
+      $('#' + field).setAttribute('aria-invalid', String(Boolean(message)));
+    });
+    const invalid = Object.keys(errors).find(k => errors[k]);
+    if (invalid) { $('#' + invalid).focus(); return; }
+    if (selected && !Fly.validSelection(selected.date, selected.time, selected.name)) {
+      selected = null; showSelection();
+      $('#chosen').textContent = 'O horário selecionado já passou. Escolha outra aula ou envie uma solicitação com horário a combinar.';
+      $('#chosen').focus(); return;
+    }
+    booking = { name, phone, interest: $('#interest').value, selected };
+    const timing = selected ? selectionText(selected) : 'Horário a combinar com a equipe';
+    $('#summary').textContent = `${name}, modalidade: ${booking.interest}. ${timing}.`;
+    const message = `Olá! Sou ${name}. Meu WhatsApp é ${phone}. Quero solicitar uma aula experimental de ${booking.interest}. ${timing}. Podem confirmar disponibilidade e condições?`;
+    $('#sendRequest').href = 'https://wa.me/5551996010890?text=' + encodeURIComponent(message);
+    $('#calendar').hidden = !selected;
+    $('#calendarNote').textContent = selected ? 'Evento provisório, com duração estimada de 1 hora. Aguarde a confirmação da academia.' : 'Escolha uma aula na página de horários para adicionar um horário provisório ao calendário.';
+    $('#confirmation').showModal();
+  });
+  $('#closeConfirmation').onclick = () => $('#confirmation').close();
+  const stamp = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z/, 'Z');
+  $('#calendar').onclick = () => {
+    if (!booking?.selected) return;
+    const { date, time, name } = booking.selected;
+    const start = Fly.instant(date, time);
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fly Academia//Solicitacao//PT-BR', 'BEGIN:VEVENT',
+      `UID:${crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2)}@fly-tarrago`,
+      `DTSTAMP:${stamp(new Date())}`, `DTSTART:${stamp(start)}`, `DTEND:${stamp(new Date(start.getTime() + 3600000))}`,
+      `SUMMARY:Provisório - ${name} na Fly Tarragó`, 'DESCRIPTION:Solicitação sujeita à confirmação pela academia.',
+      'LOCATION:Rua Tenente Ary Tarragó 1942 - Porto Alegre', 'STATUS:TENTATIVE', 'END:VEVENT', 'END:VCALENDAR', ''];
+    const url = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = 'fly-aula-provisoria.ics'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+})();
